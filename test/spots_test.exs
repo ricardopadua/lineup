@@ -4,22 +4,24 @@ defmodule Lineup.Agents.SpotsTest do
   alias Lineup.Agents.Spots
 
   test "distance_km is ~0 for the same point" do
-    assert_in_delta Spots.distance_km(-3.62, -38.73, -3.62, -38.73), 0.0, 0.001
+    assert_in_delta Spots.distance_km(-3.7155, -38.5355, -3.7155, -38.5355), 0.0, 0.001
   end
 
   test "distance_km matches a known reference distance" do
-    # Formosa Beach (CE) to Joaquina (SC), roughly 2860km apart.
-    km = Spots.distance_km(-3.62, -38.73, -27.63, -48.45)
-    assert_in_delta km, 2862, 20
+    # Praia Formosa (CE) to Joaquina (SC), roughly 2850km apart.
+    km = Spots.distance_km(-3.7155, -38.5355, -27.63, -48.45)
+    assert_in_delta km, 2850, 20
   end
 
   test "fetch/1 returns only spots within the radius, nearest first" do
-    # Praia do Futuro is real but ~31km from Formosa Beach — outside the 20km
-    # radius, so exactly Formosa Beach itself should come back here.
-    {:ok, %{nearby: nearby}} = Spots.fetch(%{lat: -3.62, lon: -38.73})
+    # Praia do Futuro is real and ~7.4km from Praia Formosa — both should
+    # come back here, ordered by distance.
+    {:ok, %{nearby: nearby}} = Spots.fetch(%{lat: -3.7155, lon: -38.5355})
 
-    assert Enum.map(nearby, & &1.name) == ["Formosa Beach"]
+    assert Enum.map(nearby, & &1.name) == ["Praia Formosa", "Praia do Futuro"]
     assert Enum.all?(nearby, &(&1.distance_km <= 20))
+    assert [%{distance_km: d1}, %{distance_km: d2}] = nearby
+    assert d1 <= d2
   end
 
   test "fetch/1 near two spots returns both, nearest first" do

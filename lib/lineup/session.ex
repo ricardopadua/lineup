@@ -77,11 +77,13 @@ defmodule Lineup.Session do
   # before we can call any data agent at all. Just stating a place
   # ("I'm in Formosa Beach") shouldn't immediately dump a full recommendation —
   # only fan out if this same message actually asks something; otherwise
-  # ask a clarifying follow-up and wait for the next turn.
+  # ask a clarifying follow-up and wait for the next turn. Every non-final
+  # reply is LLM-generated from the actual conversation (`conversational_reply/2`)
+  # instead of a canned string, so it reads like interaction, not a form.
   defp respond(text, state) do
     case extract_signals(text) do
       {:ok, %{place: nil}} ->
-        {"Where are you surfing today?", state}
+        {conversational_reply(state, "No location known yet — ask where they're surfing."), state}
 
       {:ok, %{place: place, has_question: has_question?}} ->
         case Lineup.Agents.Server.call(:geocode, %{query: place}) do
@@ -96,19 +98,23 @@ defmodule Lineup.Session do
             if has_question? do
               fan_out_and_reply(text, state)
             else
-              reply =
-                "Got it, #{place}! Want to know how it's looking right now, " <>
-                  "or were you thinking about a specific day or time?"
+              context =
+                "Location resolved to #{place}, but they haven't actually asked " <>
+                  "anything yet — acknowledge briefly and ask what they want to " <>
+                  "know (conditions right now, or a specific day/time)."
 
-              {reply, state}
+              {conversational_reply(state, context), state}
             end
 
           _ ->
-            {"Couldn't find \"#{place}\" — mind naming the city or beach again?", state}
+            context =
+              "Tried to look up \"#{place}\" but couldn't find it — ask them to clarify or try another name."
+
+            {conversational_reply(state, context), state}
         end
 
       :error ->
-        {"Where are you surfing today?", state}
+        {conversational_reply(state, "No location known yet — ask where they're surfing."), state}
     end
   end
 
@@ -125,11 +131,51 @@ defmodule Lineup.Session do
         {:stale, content} ->
           content
 
-        {:error, _reason} ->
-          "Couldn't put together a recommendation right now — try again in a bit."
+        {:error, reason} ->
+          context =
+            "Tried to put together a recommendation but hit a technical issue " <>
+              "(#{inspect(reason)}) — let them know briefly and naturally, without " <>
+              "sounding like an error message, and suggest trying again shortly."
+
+          conversational_reply(state, context)
       end
 
     {reply, state}
+  end
+
+  # Every "not a final recommendation" reply goes through the LLM, reading
+  # the actual conversation so far (not just the latest message) plus a
+  # short situational note, instead of a fixed template string — so the
+  # surfer always gets something that reads like a real reply.
+  defp conversational_reply(state, context_note) do
+    messages =
+      [%{"role" => "system", "content" => interaction_prompt()}] ++
+        Enum.map(state.history, &to_llm_message/1) ++
+        [%{"role" => "system", "content" => "Context: #{context_note}"}]
+
+    case Lineup.Groq.chat(messages, temperature: 0.4, receive_timeout: 8_000) do
+      {:ok, %{"content" => content}} when is_binary(content) -> content
+      _ -> "Having trouble connecting right now — try again in a bit?"
+    end
+  end
+
+  defp to_llm_message(%{role: :user, content: content}),
+    do: %{"role" => "user", "content" => content}
+
+  defp to_llm_message(%{role: :assistant, content: content}),
+    do: %{"role" => "assistant", "content" => content}
+
+  defp interaction_prompt do
+    """
+    You are a friendly local surfer chatting with someone about whether to
+    go surf. Keep replies short — one or two sentences, casual, like a
+    text message. Read the conversation so far and respond naturally to
+    whatever they just said (if they're just chatting, acknowledge it
+    briefly). Your goal is always to get whatever you still need — mainly
+    where they are — to give a real recommendation; ask for it naturally
+    instead of repeating a script. Never sound like an error message or a
+    form.
+    """
   end
 
   # Fires `:spots` in the background the moment location is known,
