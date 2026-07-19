@@ -12,4 +12,14 @@ defmodule Lineup do
 
   @spec consult(map()) :: map()
   defdelegate consult(request), to: Lineup.Orchestrator
+
+  @doc """
+  Sends a chat message to `user_id`'s session (started on demand),
+  resolving location and consulting agents as needed. Returns
+  `{:ok, reply}`.
+
+      Lineup.chat("user-1", "I'm in Formosa Beach, worth going out today?")
+  """
+  @spec chat(term(), String.t()) :: {:ok, String.t()}
+  defdelegate chat(user_id, text), to: Lineup.Session, as: :message
 end

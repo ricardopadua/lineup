@@ -11,9 +11,6 @@ defmodule Lineup.Agents.BuddyAgent do
 
   @behaviour Lineup.Agents.Behaviour
 
-  require Logger
-
-  @base_url "https://api.groq.com/openai/v1/chat/completions"
   @max_iterations 3
 
   @tools [
@@ -31,7 +28,7 @@ defmodule Lineup.Agents.BuddyAgent do
           "properties" => %{
             "agent" => %{
               "type" => "string",
-              "enum" => ["waves", "weather", "water_temp", "tide", "sun"]
+              "enum" => ["waves", "weather", "water_temp", "tide", "sun", "spots"]
             },
             "dates" => %{
               "type" => "array",
@@ -80,7 +77,7 @@ defmodule Lineup.Agents.BuddyAgent do
   defp loop(_messages, 0, _base_request), do: {:error, :max_iterations_reached}
 
   defp loop(messages, iterations_left, base_request) do
-    case chat_completion(messages) do
+    case Lineup.Groq.chat(messages, tools: @tools) do
       {:ok, %{"tool_calls" => tool_calls} = message}
       when is_list(tool_calls) and tool_calls != [] ->
         tool_results = Enum.map(tool_calls, &run_tool(&1, base_request))
@@ -121,32 +118,6 @@ defmodule Lineup.Agents.BuddyAgent do
   end
 
   defp with_dates(base_request, _dates), do: base_request
-
-  defp chat_completion(messages) do
-    body = %{
-      "model" => System.get_env("LLM_MODEL", "llama-3.3-70b-versatile"),
-      "messages" => messages,
-      "tools" => @tools,
-      "temperature" => 0.3
-    }
-
-    case Req.post(@base_url,
-           json: body,
-           auth: {:bearer, System.get_env("LLM_API_KEY")},
-           retry: false,
-           receive_timeout: 10_000
-         ) do
-      {:ok, %Req.Response{status: 200, body: %{"choices" => [%{"message" => message} | _]}}} ->
-        {:ok, message}
-
-      {:ok, %Req.Response{status: status, body: body}} ->
-        Logger.warning("Groq request failed: #{status} #{inspect(body)}")
-        {:error, {:http_status, status}}
-
-      {:error, reason} ->
-        {:error, reason}
-    end
-  end
 
   defp strip_nil(message), do: Map.reject(message, fn {_k, v} -> is_nil(v) end)
 

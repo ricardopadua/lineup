@@ -4,17 +4,19 @@ defmodule Lineup.Application do
   use Application
 
   alias Lineup.Agents.BuddyAgent, as: Buddy
-  alias Lineup.Agents.{Waves, Weather, WaterTemp, Tide, Traffic, Sun, Spots}
+  alias Lineup.Agents.{Waves, Weather, WaterTemp, Tide, Traffic, Sun, Spots, Geocode}
   alias Lineup.Agents.Supervisor, as: AgentSupervisor
 
-  @agents [Waves, Weather, WaterTemp, Tide, Traffic, Sun, Spots, Buddy]
+  @agents [Waves, Weather, WaterTemp, Tide, Traffic, Sun, Spots, Geocode, Buddy]
   @opts [strategy: :one_for_one, name: Lineup.Supervisor]
 
   @children [
     Lineup.Cache,
     {Registry, keys: :unique, name: Lineup.AgentRegistry},
+    {Registry, keys: :unique, name: Lineup.SessionRegistry},
     {Task.Supervisor, name: Lineup.TaskSupervisor},
-    Lineup.Agents.Supervisor
+    Lineup.Agents.Supervisor,
+    Lineup.Session.Supervisor
   ]
 
   @impl true
