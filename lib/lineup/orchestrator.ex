@@ -5,7 +5,10 @@ defmodule Lineup.Orchestrator do
   synthesize a recommendation from whatever data actually came back.
   """
 
-  @default_agents [:wave, :wind]
+  # :traffic needs an extra `:spot` destination in the request and :spots
+  # isn't implemented yet, so both are opt-in rather than part of the
+  # default fan-out (call fan_out/2 or consult/2 directly to include them).
+  @default_agents [:waves, :weather, :water_temp, :tide, :sun]
   @per_agent_timeout 6_000
 
   @spec consult(map(), [atom()]) :: map()

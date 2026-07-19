@@ -3,12 +3,11 @@ defmodule Lineup.Application do
 
   use Application
 
-  alias Lineup.Agents.WaveAgent, as: Wave
-  alias Lineup.Agents.WindAgent, as: Wind
   alias Lineup.Agents.BuddyAgent, as: Buddy
+  alias Lineup.Agents.{Waves, Weather, WaterTemp, Tide, Traffic, Sun, Spots}
   alias Lineup.Agents.Supervisor, as: AgentSupervisor
 
-  @agents [Wave, Wind, Buddy]
+  @agents [Waves, Weather, WaterTemp, Tide, Traffic, Sun, Spots, Buddy]
   @opts [strategy: :one_for_one, name: Lineup.Supervisor]
 
   @children [
