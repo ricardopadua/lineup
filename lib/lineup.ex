@@ -1,18 +1,15 @@
 defmodule Lineup do
   @moduledoc """
-  Documentation for `Lineup`.
+  Public API: concurrent, fault-tolerant surf-conditions consultation.
+
+      Lineup.consult(%{lat: -27.5, lon: -48.5})
+      #=> %{
+      #     wave: {:ok, %{wave_height_m: 1.2, ...}},
+      #     wind: {:error, :timeout},          # one agent failing doesn't block the rest
+      #     recommendation: {:ok, "Conditions look fair..."}
+      #   }
   """
 
-  @doc """
-  Hello world.
-
-  ## Examples
-
-      iex> Lineup.hello()
-      :world
-
-  """
-  def hello do
-    :world
-  end
+  @spec consult(map()) :: map()
+  defdelegate consult(request), to: Lineup.Orchestrator
 end
